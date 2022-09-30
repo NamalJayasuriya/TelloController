@@ -10,8 +10,8 @@ import numpy as np
 import paddlehub as hub
 from PIL import Image
 
-from .stats import Stats
-from .frame2html import VideoCamera, run_app
+from stats import Stats
+from video import VideoCamera, run_app
 
 q = queue.Queue()
 
@@ -37,7 +37,9 @@ class Tello:
         self.frame = None
 
         # 加载动物识别模型
-        self.module = hub.Module(name="resnet50_vd_animals")
+        # self.module = hub.Module(name="ultra_light_fast_generic_face_detector_1mb_640")
+        self.hog = cv2.HOGDescriptor()
+        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
 
         # 初始化响应线程
         self.receive_thread = threading.Thread(target=self._receive_thread)
@@ -56,17 +58,22 @@ class Tello:
         self.now_color = 0
         self.MAX_TIME_OUT = 15.0
         self.debug = debug
+        self.command_ready = True
 
         # 将无人机设置为命令模式
         self.command()
 
     def send_command(self, command: str, query: bool = False):
+
+        # self.command_ready = False # added by NAmal
+
         # 为出站命令创建新的日志条目
         self.log.append(Stats(command, len(self.log)))
 
         # 向无人机发送命令
         self.socket.sendto(command.encode('utf-8'), self.te_address)
         # 显示确认消息
+
         if self.debug is True:
             print('Send Command: {}'.format(command))
 
@@ -102,6 +109,28 @@ class Tello:
                 ret, frame = cap.read()
                 if self.flip_frame:
                     frame = cv2.flip(frame, 0)
+
+                # # --- added by namal ---
+                # # resizing for faster detection
+                # frame = cv2.resize(frame, (640, 480))
+                # # using a greyscale picture, also for faster detection
+                # gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+                #
+                # # detect people in the image
+                # # returns the bounding boxes for the detected objects
+                # boxes, weights = self.hog.detectMultiScale(frame, winStride=(8, 8))
+                #
+                # boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
+                #
+                # if len(boxes) > 0:
+                #     print("Human detected")
+                #
+                # for (xA, yA, xB, yB) in boxes:
+                #     # display the detected boxes in the colour picture
+                #     cv2.rectangle(frame, (xA, yA), (xB, yB),
+                #                   (0, 255, 0), 2)
+                # # ------
+
                 cv2.imshow("DJI Tello", frame)
                 q.put(frame)
                 k = cv2.waitKey(1) & 0xFF
@@ -128,14 +157,46 @@ class Tello:
 
             # 识别动物
             if self.animal_state:
-                results = self.module.classification(images=[self.frame])
+                # results = self.module.face_detection(images=[self.frame],visualization = True, output_dir = 'DETECTED')
                 # print(results)
-                key_value_list = list(results[0].items())
-                key_first, value_first = key_value_list[0][0], key_value_list[0][1]
-                if '非动物' != key_first:
-                    # print('检测结果是：', key_first, '，相似度为：', value_first)
-                    cv2.imshow(key_first, self.frame)
-                    self.animal_state = False
+                # key_value_list = list(results[0].items())
+                # key_first, value_first = key_value_list[0][0], key_value_list[0][1]
+                # print(key_first) # Edited By Namal
+                # if '非动物' != key_first:
+                #     # print('检测结果是：', key_first, '，相似度为：', value_first)
+                #     cv2.imshow(key_first, self.frame)
+                #     self.animal_state = False
+
+                # --- added by namal ---
+                # resizing for faster detection
+                frame = cv2.resize(self.frame, (640, 480))
+                # using a greyscale picture, also for faster detection
+                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+
+                # detect people in the image
+                # returns the bounding boxes for the detected objects
+                boxes, weights = self.hog.detectMultiScale(frame, winStride=(8, 8))
+
+                boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
+
+                if len(boxes) > 0:
+                    print("Human detected")
+
+                for (xA, yA, xB, yB) in boxes:
+                    # display the detected boxes in the colour picture
+                    cv2.rectangle(frame, (xA, yA), (xB, yB),
+                                  (0, 255, 0), 2)
+                self.frame = frame
+                # # Write the output video
+                # out.write(frame.astype('uint8'))
+                # # Display the resulting frame
+                #self.animal_state = False
+                # self.streamoff()
+                # self.stream_state = False
+                # self.video_state = False
+                #cv2.imshow('frame', self.frame)
+
+                # ----------------------
 
             # 显示照片
             if self.picture_state:

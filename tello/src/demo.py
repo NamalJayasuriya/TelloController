@@ -7,13 +7,13 @@ drone = tello.Tello()
 drone.takeoff()
 
 # 前进100cm
-drone.forward(100)
+drone.forward(20)
 
 # 旋转90°
-drone.cw(90)
+drone.cw(30)
 
 # 左翻滚
-drone.flip('l')
+#drone.flip('l')
 
 # 打开视频流
 drone.streamon()

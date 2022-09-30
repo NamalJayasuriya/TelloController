@@ -1,4 +1,8 @@
-# Tello-Python
+# TelloController
+
+This project is a modified version of cocopy/Tello-Python Project
+https://github.com/cocpy/Tello-Python
+
     Control DJI Tello drone with python
 
 
