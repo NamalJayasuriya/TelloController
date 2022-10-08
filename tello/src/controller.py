@@ -6,11 +6,12 @@ class DroneController(object):
     def __init__(self, drone):
 
         # control variables
-        self.distance = 20  # default distance for 'move' cmd
-        self.degree = 30  # default degree for 'cw' or 'ccw' cmd
+        self.distance = 20  # default distance for '15move' cmd
+        self.degree = 30  # defaul
+        # t degree for 'cw' or 'ccw' cmd
         self.log_seqence = 0 #sequence number of last log
         self.log_update = 0 #latest sequence number
-
+        self.controller = False
     def on_press(self, key):
         if key == keyboard.Key.esc:
             if drone.get_height()>0:
@@ -28,9 +29,17 @@ class DroneController(object):
         self.log_update = len(drone.log)
         print(self.log_seqence, self.log_update)
 
-        if self.log_update <= self.log_seqence: #if a respond has not received after previous command
+        if self.log_update < self.log_seqence: #if a respond has not received after previous command
             print("Waiting for response, Sequence number for last respond: {0}".format(self.log_seqence))
-
+        elif k == 'Z':
+                if self.controller:
+                    self.controller = False
+                else:
+                    self.controller = True
+                self.log_update = self.log_seqence
+                print("Contoller: ", self.controller)
+        elif not self.controller:
+            print("Controller is disabled: pres Z to enable")
         else:
             self.log_update = len(drone.log)
             self.log_seqence = self.log_update
@@ -81,7 +90,17 @@ class DroneController(object):
                 print("Request for enabling video")
                 self.handle_response(drone.streamon())
                 # drone.video_state = True
-                drone.stream_service_on()
+                # drone.stream_service_on()
+            elif k == 'r' or k == 'R':
+                print("Request for setting video resolution")
+                res = int(input("Enter resolution; 480 or 720:"))
+                self.handle_response(drone.set_resolution(res)) # 480 or 720 only
+                self.log_update += 1
+            elif k == 'f' or k == 'F':
+                print("Request for setting video fps")
+                fps = int(input("Enter fps; 5, 15 or 30:"))
+                self.handle_response(drone.set_fps(fps)) # 5, 15, 30 only
+                self.log_update += 1
             elif k == 'i' or k == 'I':
                 print("Identifying Animals")
                 drone.identify_animal()
