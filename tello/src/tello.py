@@ -11,8 +11,8 @@ import paddlehub as hub
 from PIL import Image
 
 from stats import Stats
-from video import VideoCamera, run_app
-
+# from video import VideoCamera, run_app
+import torch
 q = queue.Queue()
 
 
@@ -36,10 +36,19 @@ class Tello:
         self.file_path = ''
         self.frame = None
 
-        # 加载动物识别模型
+        # Defining Object detection model
         # self.module = hub.Module(name="ultra_light_fast_generic_face_detector_1mb_640")
-        self.hog = cv2.HOGDescriptor()
-        self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        # --------------
+        # self.hog = cv2.HOGDescriptor()
+        # self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        # -------------------
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+        self.model.conf = 0.4  # set inference threshold at 0.3
+        self.model.iou = 0.3  # set inference IOU threshold at 0.3
+        self.model.classes = [0, 15, 16, 24, 25, 26, 39, 41, 42, 43, 44, 56,57,59,62,63,67,73]  # set model to only detect "Person" class
+        self.classes = {0:'person', 15:'cat', 16:'dog', 24:'backpack', 25:'umbrella', 26:'handbag', 39:'bottle', 41:'cup', 42:'fork', 43:'knife', 44:'spoon', 45:'bowl', 56:'chair' ,57:'couch' ,59:'bed', 60:'dinning_table' ,62:'tv' ,63:'laptop' ,67:'phone', 73:'book', 75:'vase'}
+        #-----------------------
 
         # 初始化响应线程
         self.receive_thread = threading.Thread(target=self._receive_thread)
@@ -62,6 +71,39 @@ class Tello:
 
         # 将无人机设置为命令模式
         self.command()
+
+    def score_frame(self, frame):
+        """
+        function scores each frame of the video and returns results.
+        :param frame: frame to be infered.
+        :return: labels and coordinates of objects found.
+        """
+        self.model.to(self.device)
+        results = self.model([frame])
+        labels, cord = results.xyxyn[0][:, -1].to('cpu').numpy(), results.xyxyn[0][:, :-1].to('cpu').numpy()
+        return labels, cord
+
+    def plot_boxes(self, results, frame):
+        """
+        plots boxes and labels on frame.
+        :param results: inferences made by model
+        :param frame: frame on which to  make the plots
+        :return: new frame with boxes and labels plotted.
+        """
+        labels, cord = results
+        n = len(labels)
+        x_shape, y_shape = frame.shape[1], frame.shape[0]
+        for i in range(n):
+            row = cord[i]
+            x1, y1, x2, y2 = int(row[0]*x_shape), int(row[1]*y_shape), int(row[2]*x_shape), int(row[3]*y_shape)
+            bgr = (0, 0, 255)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), bgr, 1)
+            label = f"{int(row[4]*100)}"
+            label = "{0}:{1}".format(self.classes[int(labels[i])], label)
+            cv2.putText(frame, label, (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+            cv2.putText(frame, f"Total Targets: {n}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        return frame
 
     def send_command(self, command: str, query: bool = False):
 
@@ -101,10 +143,13 @@ class Tello:
 
     def _cap_video_thread(self):
         # 创建流捕获对象
-        cap = cv2.VideoCapture('udp://' + self.te_ip + ':11111')
+        cap = cv2.VideoCapture('udp://' + self.te_ip + ':11111')  #'udp://192.168.10.1:11111'
+
         # cap.set(cv2.CAP_PROP_BUFFERSIZE, 2)
+
         while self.stream_state:
             ret, frame = cap.read()
+            # seq += 1
             while ret:
                 ret, frame = cap.read()
                 if self.flip_frame:
@@ -130,6 +175,12 @@ class Tello:
                 #     cv2.rectangle(frame, (xA, yA), (xB, yB),
                 #                   (0, 255, 0), 2)
                 # # ------
+                #------------------
+                # resizing for faster detection
+                # frame = cv2.resize(frame, (640, 480))
+                results = self.score_frame(frame)
+                frame = self.plot_boxes(results, frame)
+                #------------------
 
                 cv2.imshow("DJI Tello", frame)
                 q.put(frame)
@@ -229,18 +280,18 @@ class Tello:
         # 延迟激活
         time.sleep(delay)
 
-    @staticmethod
-    def video_http(frame):
-        vc = VideoCamera(frame)
-        run_app()
-
-    @staticmethod
-    def video_save(frame):
-        force = cv2.VideoWriter_fourcc(*'XVID')
-        out = cv2.VideoWriter('output.avi', force, 20.0, (640, 480))
-        frame = cv2.flip(frame, 0)
-        # write the flipped frame
-        out.write(frame)
+    # @staticmethod
+    # def video_http(frame):
+    #     # vc = VideoCamera(frame)
+    #     # run_app()
+    #
+    # @staticmethod
+    # def video_save(frame):
+    #     force = cv2.VideoWriter_fourcc(*'XVID')
+    #     out = cv2.VideoWriter('output.avi', force, 20.0, (640, 480))
+    #     frame = cv2.flip(frame, 0)
+    #     # write the flipped frame
+    #     out.write(frame)
 
     def get_log(self):
         return self.log
@@ -287,6 +338,7 @@ class Tello:
     def streamon(self):
         """打开视频流"""
         self.send_command('streamon')
+        print(self.te_ip)
         self.stream_state = True
 
         self.cap_video_thread = threading.Thread(target=self._cap_video_thread)
@@ -303,6 +355,24 @@ class Tello:
         self.service_video_thread = threading.Thread(target=self._service_video_thread)
         self.service_video_thread.daemon = True
         self.service_video_thread.start()
+
+
+    def set_resolution(self, res):
+        if res == 480:
+            self.send_command('setresolution low')
+        elif res ==720:
+            self.send_command('setresolution high')
+        else:
+            print(" Invalid Resolution : Set 480P or 720P")
+    def set_fps(self, res):
+        if res == 5:
+            self.send_command('setfps low')
+        elif res ==15:
+            self.send_command('setfps middle')
+        elif res == 30:
+            self.send_command('setfps high')
+        else:
+            print("Invalid frame rate: Set 5, 15 or 30")
 
     def detect_color(self, frame):
         """颜色识别"""
