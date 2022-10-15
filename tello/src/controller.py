@@ -1,4 +1,4 @@
-from pynput import keyboard
+# from pynput import keyboard
 import  tello
 
 class DroneController(object):
@@ -113,11 +113,6 @@ class DroneController(object):
             print(str(res)[-6:])
         except Exception as err:
             print("Error: {0}".format(err))
-
-    def keyboard_listner(self):
-        listener = keyboard.Listener(on_press=self.on_press)
-        listener.start()  # start to listen on a separate thread
-        listener.join()
 
 
 if __name__ == '__main__':
