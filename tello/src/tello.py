@@ -5,14 +5,14 @@ import threading
 import time
 import datetime
 
-import cv2
 import numpy as np
-import paddlehub as hub
-from PIL import Image
 
+from PIL import Image
 from stats import Stats
-# from video import VideoCamera, run_app
-import torch
+
+# import cv2
+# import torch
+
 q = queue.Queue()
 
 
@@ -37,18 +37,14 @@ class Tello:
         self.frame = None
 
         # Defining Object detection model
-        # self.module = hub.Module(name="ultra_light_fast_generic_face_detector_1mb_640")
-        # --------------
-        # self.hog = cv2.HOGDescriptor()
-        # self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
         # -------------------
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-        self.model.conf = 0.4  # set inference threshold at 0.3
-        self.model.iou = 0.3  # set inference IOU threshold at 0.3
-        self.model.classes = [0, 15, 16, 24, 25, 26, 39, 41, 42, 43, 44, 56,57,59,62,63,67,73]  # set model to only detect "Person" class
-        self.classes = {0:'person', 15:'cat', 16:'dog', 24:'backpack', 25:'umbrella', 26:'handbag', 39:'bottle', 41:'cup', 42:'fork', 43:'knife', 44:'spoon', 45:'bowl', 56:'chair' ,57:'couch' ,59:'bed', 60:'dinning_table' ,62:'tv' ,63:'laptop' ,67:'phone', 73:'book', 75:'vase'}
-        #-----------------------
+        # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        # self.model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+        # self.model.conf = 0.4  # set inference threshold at 0.3
+        # self.model.iou = 0.3  # set inference IOU threshold at 0.3
+        # self.model.classes = [0, 15, 16, 24, 25, 26, 39, 41, 42, 43, 44, 56,57,59,62,63,67,73]  # set model to only detect "Person" class
+        # self.classes = {0:'person', 15:'cat', 16:'dog', 24:'backpack', 25:'umbrella', 26:'handbag', 39:'bottle', 41:'cup', 42:'fork', 43:'knife', 44:'spoon', 45:'bowl', 56:'chair' ,57:'couch' ,59:'bed', 60:'dinning_table' ,62:'tv' ,63:'laptop' ,67:'phone', 73:'book', 75:'vase'}
+        # #-----------------------
 
         # 初始化响应线程
         self.receive_thread = threading.Thread(target=self._receive_thread)
@@ -72,38 +68,38 @@ class Tello:
         # 将无人机设置为命令模式
         self.command()
 
-    def score_frame(self, frame):
-        """
-        function scores each frame of the video and returns results.
-        :param frame: frame to be infered.
-        :return: labels and coordinates of objects found.
-        """
-        self.model.to(self.device)
-        results = self.model([frame])
-        labels, cord = results.xyxyn[0][:, -1].to('cpu').numpy(), results.xyxyn[0][:, :-1].to('cpu').numpy()
-        return labels, cord
+    # def score_frame(self, frame):
+    #     """
+    #     function scores each frame of the video and returns results.
+    #     :param frame: frame to be infered.
+    #     :return: labels and coordinates of objects found.
+    #     """
+    #     self.model.to(self.device)
+    #     results = self.model([frame])
+    #     labels, cord = results.xyxyn[0][:, -1].to('cpu').numpy(), results.xyxyn[0][:, :-1].to('cpu').numpy()
+    #     return labels, cord
 
-    def plot_boxes(self, results, frame):
-        """
-        plots boxes and labels on frame.
-        :param results: inferences made by model
-        :param frame: frame on which to  make the plots
-        :return: new frame with boxes and labels plotted.
-        """
-        labels, cord = results
-        n = len(labels)
-        x_shape, y_shape = frame.shape[1], frame.shape[0]
-        for i in range(n):
-            row = cord[i]
-            x1, y1, x2, y2 = int(row[0]*x_shape), int(row[1]*y_shape), int(row[2]*x_shape), int(row[3]*y_shape)
-            bgr = (0, 0, 255)
-            cv2.rectangle(frame, (x1, y1), (x2, y2), bgr, 1)
-            label = f"{int(row[4]*100)}"
-            label = "{0}:{1}".format(self.classes[int(labels[i])], label)
-            cv2.putText(frame, label, (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
-            cv2.putText(frame, f"Total Targets: {n}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-        return frame
+    # def plot_boxes(self, results, frame):
+    #     """
+    #     plots boxes and labels on frame.
+    #     :param results: inferences made by model
+    #     :param frame: frame on which to  make the plots
+    #     :return: new frame with boxes and labels plotted.
+    #     """
+    #     labels, cord = results
+    #     n = len(labels)
+    #     x_shape, y_shape = frame.shape[1], frame.shape[0]
+    #     for i in range(n):
+    #         row = cord[i]
+    #         x1, y1, x2, y2 = int(row[0]*x_shape), int(row[1]*y_shape), int(row[2]*x_shape), int(row[3]*y_shape)
+    #         bgr = (0, 0, 255)
+    #         cv2.rectangle(frame, (x1, y1), (x2, y2), bgr, 1)
+    #         label = f"{int(row[4]*100)}"
+    #         label = "{0}:{1}".format(self.classes[int(labels[i])], label)
+    #         cv2.putText(frame, label, (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 1)
+    #         cv2.putText(frame, f"Total Targets: {n}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+    #
+    #     return frame
 
     def send_command(self, command: str, query: bool = False):
 
@@ -156,25 +152,6 @@ class Tello:
                     frame = cv2.flip(frame, 0)
 
                 # # --- added by namal ---
-                # # resizing for faster detection
-                # frame = cv2.resize(frame, (640, 480))
-                # # using a greyscale picture, also for faster detection
-                # gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-                #
-                # # detect people in the image
-                # # returns the bounding boxes for the detected objects
-                # boxes, weights = self.hog.detectMultiScale(frame, winStride=(8, 8))
-                #
-                # boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
-                #
-                # if len(boxes) > 0:
-                #     print("Human detected")
-                #
-                # for (xA, yA, xB, yB) in boxes:
-                #     # display the detected boxes in the colour picture
-                #     cv2.rectangle(frame, (xA, yA), (xB, yB),
-                #                   (0, 255, 0), 2)
-                # # ------
                 #------------------
                 # resizing for faster detection
                 # frame = cv2.resize(frame, (640, 480))
@@ -205,60 +182,6 @@ class Tello:
                 except Exception as e:
                     print('保存图片失败')
                 self.camera_state = False
-
-            # 识别动物
-            if self.animal_state:
-                # results = self.module.face_detection(images=[self.frame],visualization = True, output_dir = 'DETECTED')
-                # print(results)
-                # key_value_list = list(results[0].items())
-                # key_first, value_first = key_value_list[0][0], key_value_list[0][1]
-                # print(key_first) # Edited By Namal
-                # if '非动物' != key_first:
-                #     # print('检测结果是：', key_first, '，相似度为：', value_first)
-                #     cv2.imshow(key_first, self.frame)
-                #     self.animal_state = False
-
-                # --- added by namal ---
-                # resizing for faster detection
-                frame = cv2.resize(self.frame, (640, 480))
-                # using a greyscale picture, also for faster detection
-                gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-
-                # detect people in the image
-                # returns the bounding boxes for the detected objects
-                boxes, weights = self.hog.detectMultiScale(frame, winStride=(8, 8))
-
-                boxes = np.array([[x, y, x + w, y + h] for (x, y, w, h) in boxes])
-
-                if len(boxes) > 0:
-                    print("Human detected")
-
-                for (xA, yA, xB, yB) in boxes:
-                    # display the detected boxes in the colour picture
-                    cv2.rectangle(frame, (xA, yA), (xB, yB),
-                                  (0, 255, 0), 2)
-                self.frame = frame
-                # # Write the output video
-                # out.write(frame.astype('uint8'))
-                # # Display the resulting frame
-                #self.animal_state = False
-                # self.streamoff()
-                # self.stream_state = False
-                # self.video_state = False
-                #cv2.imshow('frame', self.frame)
-
-                # ----------------------
-
-            # 显示照片
-            if self.picture_state:
-                file = self.file_path
-                f = Image.open(file).show()
-                self.picture_state = False
-
-            # 识别当前颜色
-            if self.color_state:
-                self.detect_color(self.frame)
-                self.color_state = False
 
             # 将视频流发送至http
             if self.video_state:
@@ -309,10 +232,6 @@ class Tello:
         """翻转视频，在加装下视镜片的情况下开启"""
         self.flip_frame = True
 
-    def identify_animal(self):
-        """识别动物"""
-        self.animal_state = True
-
     def identify_color(self):
         """识别当前颜色(红色或绿色)"""
         self.color_state = True
@@ -340,10 +259,10 @@ class Tello:
         self.send_command('streamon')
         print(self.te_ip)
         self.stream_state = True
-
-        self.cap_video_thread = threading.Thread(target=self._cap_video_thread)
-        self.cap_video_thread.daemon = True
-        self.cap_video_thread.start()
+        #ToDO: uncomment for enable video thred
+        # self.cap_video_thread = threading.Thread(target=self._cap_video_thread)
+        # self.cap_video_thread.daemon = True
+        # self.cap_video_thread.start()
 
     def streamoff(self):
         """关闭视频流"""
@@ -373,40 +292,6 @@ class Tello:
             self.send_command('setfps high')
         else:
             print("Invalid frame rate: Set 5, 15 or 30")
-
-    def detect_color(self, frame):
-        """颜色识别"""
-        # frame = cv2.imread("test.jpg")
-        hue_image = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-        low_red_range1 = np.array([110, 43, 0])
-        high_red_range1 = np.array([180, 255, 255])
-        threshold_red1 = cv2.inRange(hue_image, low_red_range1, high_red_range1)
-        res_red1 = cv2.bitwise_and(frame, frame, mask=threshold_red1)
-
-        low_red_range2 = np.array([0, 43, 0])
-        high_red_range2 = np.array([10, 255, 255])
-        threshold_red2 = cv2.inRange(hue_image, low_red_range2, high_red_range2)
-        res_red2 = cv2.bitwise_and(frame, frame, mask=threshold_red2)
-
-        threshold_red = threshold_red1 + threshold_red2
-        res_red = res_red1 + res_red2
-
-        low_green_range = np.array([35, 43, 46])
-        high_green_range = np.array([77, 255, 255])
-        threshold_green = cv2.inRange(hue_image, low_green_range, high_green_range)
-        res_green = cv2.bitwise_and(frame, frame, mask=threshold_green)
-
-        res = res_red + res_green
-        if cv2.countNonZero(threshold_green) > 0.5 * np.size(threshold_green):
-            self.now_color = 'green'
-        elif ((cv2.countNonZero(threshold_red) > 0.5 * np.size(threshold_red)) & (
-                cv2.countNonZero(threshold_red) < 0.7 * np.size(threshold_red))):
-            self.now_color = 'red'
-        else:
-            self.now_color = 'none'
-            # color = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
-        return self.now_color, res
 
     def emergency(self):
         """停止电机转动"""
